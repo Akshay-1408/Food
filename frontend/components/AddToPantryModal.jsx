@@ -132,7 +132,7 @@ export default function AddToPantryModal({ isOpen, onClose, onSuccess }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto rounded-none">
+      <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold tracking-tight">
             Add to Pantry
