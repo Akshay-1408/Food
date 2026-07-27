@@ -1,123 +1,128 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 
-const STRAPI_URL = 
-    process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
+const STRAPI_URL =
+  process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
 const STRAPI_API_TOKEN = process.env.STRAPI_API_TOKEN;
 
+export const checkUser = async () => {
+  try {
+    const clerkUser = await currentUser();
 
-
-export const checkUser = async() => {
-    const user = await currentUser();
-
-    if(!user){
-        console.log("No User Found");
-        return null;
+    if (!clerkUser) {
+      console.log("No User Found");
+      return null;
     }
 
-    if(!STRAPI_API_TOKEN){
-        console.error("STRAPI_API_TOKEN is missing in .env.local");
-        return null;
+    if (!STRAPI_API_TOKEN) {
+      console.error("Missing STRAPI_API_TOKEN");
+      return null;
     }
-    const {has} = await auth();
-    const subscriptionTier =  has({plan : "pro"}) ? "pro" : "free";
 
-    try {
-        // check if user exixts in strapi
-        const existingUserResponse = await fetch(
-            `${STRAPI_URL}/api/users?filters[clerkid][$eq]=${user.id}`,
-            {
-            headers: {
-                Authorization : `Bearer ${STRAPI_API_TOKEN}`,
-            },
-            cache : "no-store",
-            }
-        );
+    const { has } = await auth();
+    const subscriptionTier = has({ plan: "pro" }) ? "pro" : "free";
 
-        if(!existingUserResponse.ok){
-            const errorText = await existingUserResponse.text();
-            console.error("Strapi error response", errorText);
-            return null;
-        }
+    const email = clerkUser.emailAddresses[0].emailAddress;
 
-        const existingUserData = await existingUserResponse.json();
+    // Get all users
+    const usersResponse = await fetch(`${STRAPI_URL}/api/users`, {
+      headers: {
+        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+      },
+      cache: "no-store",
+    });
 
-        if (existingUserData.length > 0){
-            const existingUser = existingUserData[0];
+    if (!usersResponse.ok) {
+      console.error(await usersResponse.text());
+      return null;
+    }
 
-            if(existingUser.subscriptionTier !== subscriptionTier){
-                await fetch(`${STRAPI_URL}/api/users/${existingUser.id}`, {
-                    method: "PUT",
-                    headers : {
-                        "Content-Type" : "application/json",
-                        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
-                    },
-                    body : JSON.stringify({
-                            subscriptionTier,
-                        },
-                    ),
-                });
-            }
-            return {...existingUser,subscriptionTier};
-        }
+    const users = await usersResponse.json();
 
-        //create new user in strapi 
-        const rolesResponse = await fetch(
-            `${STRAPI_URL}/api/users-permissions/roles`,
-            {
-                headers : {
-                    Authorization : `Bearer ${STRAPI_API_TOKEN}`, 
-                },
-            }
-        );
+    // Find existing user
+    let existingUser = users.find(
+      (u) =>
+        u.email === email ||
+        u.clerkid === clerkUser.id
+    );
 
-        const rolesdata = await rolesResponse.json();
-        const authenticatedRole = rolesdata.roles.find(
-            (role)=>role.type === "authenticated"
-        );
-
-        if(!authenticatedRole){
-            console.error("Authenticated roles not found")
-            return null;
-        }
-
-        const userdata = {
-            username:
-                user.username || user.emailAddresses[0].emailAddress.split("@")[0],
-            email: user.emailAddresses[0].emailAddress,
-            password : `clerk_managed_${user.id}_${Date.now()}`,
-            confirmed : true,
-            blocked : false, 
-            clerkid : user.id,
+    if (existingUser) {
+      // Update subscription if changed
+      if (
+        existingUser.subscriptionTier !== subscriptionTier ||
+        existingUser.clerkid !== clerkUser.id
+      ) {
+        await fetch(`${STRAPI_URL}/api/users/${existingUser.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+          },
+          body: JSON.stringify({
             subscriptionTier,
-            role : authenticatedRole.id,
-
-            
-            firstName : user.firstName || "",
-            lastName : user.lastName || "",
-            imageUrl : user.imageUrl || "",
-            subscriptionTier,
-        };
-
-        const newUserResponse = await fetch(`${STRAPI_URL}/api/users` , {
-            method : "POST",
-            headers : {
-                "Content-Type" : "application/json",
-                Authorization : `Bearer ${STRAPI_API_TOKEN}`,
-            },
-            body : JSON.stringify(userdata),
+            clerkid: clerkUser.id,
+          }),
         });
 
-        if(!newUserResponse.ok){
-            const errorText = await newUserResponse.text();
-            console.error("Strapi Error response : ",errorText);
-            return null;
-        }
+        existingUser.subscriptionTier = subscriptionTier;
+        existingUser.clerkid = clerkUser.id;
+      }
 
-        const newUser = await newUserResponse.json();
-        return{...newUser,subscriptionTier};
-
-    } catch (error) {
-        console.error("Error in checkUser:",error.message);
-        return null;
+      return existingUser;
     }
+
+    // Get authenticated role
+    const roleResponse = await fetch(
+      `${STRAPI_URL}/api/users-permissions/roles`,
+      {
+        headers: {
+          Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+        },
+      }
+    );
+
+    const roleData = await roleResponse.json();
+
+    const authenticatedRole = roleData.roles.find(
+      (role) => role.type === "authenticated"
+    );
+
+    if (!authenticatedRole) {
+      console.error("Authenticated role not found");
+      return null;
+    }
+
+    // Create new user
+    const createResponse = await fetch(`${STRAPI_URL}/api/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${STRAPI_API_TOKEN}`,
+      },
+      body: JSON.stringify({
+        username:
+          clerkUser.username ??
+          email.split("@")[0],
+        email,
+        password: `clerk_${clerkUser.id}_${Date.now()}`,
+        confirmed: true,
+        blocked: false,
+        role: authenticatedRole.id,
+        clerkid: clerkUser.id,
+        firstName: clerkUser.firstName || "",
+        lastName: clerkUser.lastName || "",
+        imageUrl: clerkUser.imageUrl || "",
+        subscriptionTier,
+      }),
+    });
+
+    if (!createResponse.ok) {
+      console.error(await createResponse.text());
+      return null;
+    }
+
+    return await createResponse.json();
+  } catch (error) {
+    console.error("checkUser Error:", error);
+    return null;
+  }
 };
