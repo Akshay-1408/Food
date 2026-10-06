@@ -1,33 +1,39 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Clock, Users, ChefHat } from "lucide-react";
+import { Clock, Users, ChefHat, Heart, ShoppingBag, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { isFavorite, toggleFavorite } from "@/lib/favorites-history";
+import { addMultipleShoppingItems } from "@/lib/shopping-list";
+import { toast } from "sonner";
 
 export default function RecipeCard({ recipe, variant = "default" }) {
-  // Handle different recipe data structures
+  const [fav, setFav] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Normalize recipe data
   const getRecipeData = () => {
-    // For MealDB recipes (category/cuisine pages)
+    if (!recipe) return {};
+
     if (recipe.strMeal) {
       return {
+        id: recipe.idMeal || recipe.strMeal,
         title: recipe.strMeal,
         image: recipe.strMealThumb,
+        category: recipe.strCategory || "",
+        cuisine: recipe.strArea || "",
         href: `/recipe?cook=${encodeURIComponent(recipe.strMeal)}`,
         showImage: true,
       };
     }
 
-    // For AI-generated pantry recipes
-    if (recipe.matchPercentage) {
+    if (recipe.matchPercentage !== undefined) {
       return {
+        id: recipe.id || recipe.title,
         title: recipe.title,
         description: recipe.description,
         category: recipe.category,
@@ -37,102 +43,120 @@ export default function RecipeCard({ recipe, variant = "default" }) {
         servings: recipe.servings,
         matchPercentage: recipe.matchPercentage,
         missingIngredients: recipe.missingIngredients || [],
-        image: recipe.imageUrl, // Add image support
-        href: `/recipe?cook=${encodeURIComponent(recipe.title)}`,
-        showImage: !!recipe.imageUrl, // Show if image exists
-      };
-    }
-
-    // For Strapi recipes (saved recipes, search results)
-    if (recipe) {
-      return {
-        title: recipe.title,
-        description: recipe.description,
-        category: recipe.category,
-        cuisine: recipe.cuisine,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
-        servings: recipe.servings,
         image: recipe.imageUrl,
         href: `/recipe?cook=${encodeURIComponent(recipe.title)}`,
         showImage: !!recipe.imageUrl,
       };
     }
 
-    return {};
+    return {
+      id: recipe.id || recipe.documentId || recipe.title,
+      title: recipe.title,
+      description: recipe.description,
+      category: recipe.category,
+      cuisine: recipe.cuisine,
+      prepTime: recipe.prepTime,
+      cookTime: recipe.cookTime,
+      servings: recipe.servings,
+      image: recipe.imageUrl,
+      href: `/recipe?cook=${encodeURIComponent(recipe.title)}`,
+      showImage: !!recipe.imageUrl,
+    };
   };
 
   const data = getRecipeData();
 
-  // Variant: grid (for category/cuisine pages with images)
+  useEffect(() => {
+    if (data.title) {
+      setFav(isFavorite(data.title));
+    }
+  }, [data.title]);
+
+  const handleFavoriteClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const updated = toggleFavorite(recipe);
+    setFav(updated);
+    if (updated) {
+      toast.success(`Saved "${data.title}" to favorites!`);
+    } else {
+      toast.info(`Removed "${data.title}" from favorites.`);
+    }
+  };
+
+  const handleAddMissingToShoppingList = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (data.missingIngredients && data.missingIngredients.length > 0) {
+      addMultipleShoppingItems(data.missingIngredients, data.title);
+      toast.success(`Added ${data.missingIngredients.length} missing items to Shopping List!`);
+    }
+  };
+
+  // Variant: grid
   if (variant === "grid") {
     return (
-      <Link href={data.href}>
-        <Card className="rounded-none overflow-hidden border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group pt-0">
+      <Card className="rounded-3xl overflow-hidden border border-stone-200 hover:border-orange-500 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white cursor-pointer p-0 relative">
+        <Link href={data.href || "#"} className="block">
+          {/* Favorite Button Overlay */}
+          <button
+            onClick={handleFavoriteClick}
+            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/80 backdrop-blur-md shadow-md text-stone-600 hover:text-red-500 transition-transform active:scale-90"
+            title={fav ? "Remove Favorite" : "Save Favorite"}
+          >
+            <Heart className={`w-4 h-4 ${fav ? "fill-red-500 text-red-500" : ""}`} />
+          </button>
+
           {/* Image */}
-          {data.showImage ? (
-            <div className="relative aspect-square">
+          <div className="relative aspect-4/3 overflow-hidden bg-stone-100">
+            {data.showImage && !imageError ? (
               <Image
                 src={data.image}
                 alt={data.title}
                 fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                onError={() => setImageError(true)}
+                sizes="(max-width: 768px) 100vw, 33vw"
               />
-
-              {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <div className="absolute bottom-0 left-0 right-0 p-4">
-                  <p className="text-white text-sm font-medium">
-                    Click to view recipe
-                  </p>
-                </div>
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 flex items-center justify-center">
+                <ChefHat className="w-16 h-16 text-white/30" />
               </div>
-            </div>
-          ) : (
-            // Fallback gradient background when no image
-            <div className="relative aspect-square bg-gradient-to-br from-orange-400 via-amber-400 to-yellow-400 flex items-center justify-center">
-              <ChefHat className="w-20 h-20 text-white/30" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-            </div>
-          )}
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
 
-          {/* Title */}
-          <CardHeader>
-            <CardTitle className="text-lg font-bold text-stone-900 group-hover:text-orange-600 transition-colors line-clamp-2">
+          <CardHeader className="p-4">
+            <CardTitle className="text-base font-bold text-stone-900 group-hover:text-orange-600 transition-colors line-clamp-1">
               {data.title}
             </CardTitle>
           </CardHeader>
-        </Card>
-      </Link>
+        </Link>
+      </Card>
     );
   }
 
-  // Variant: pantry (for AI-generated suggestions with match percentage)
+  // Variant: pantry (AI-generated match recommendations)
   if (variant === "pantry") {
     return (
-      <Card className="rounded-none border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
-        {/* Image at top (if available) */}
-        {data.showImage && (
-          <div className="relative aspect-video">
+      <Card className="rounded-3xl border border-stone-200 hover:border-emerald-500 hover:shadow-xl transition-all duration-300 overflow-hidden bg-white flex flex-col">
+        {data.showImage && !imageError && (
+          <div className="relative aspect-video bg-stone-100">
             <Image
               src={data.image}
               alt={data.title}
               fill
               className="object-cover"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              onError={() => setImageError(true)}
             />
-            {/* Match Percentage Badge on Image */}
             {data.matchPercentage && (
               <div className="absolute top-4 right-4">
                 <Badge
                   className={`${
-                    data.matchPercentage >= 90
-                      ? "bg-green-600"
-                      : data.matchPercentage >= 75
-                      ? "bg-orange-600"
-                      : "bg-stone-600"
-                  } text-white text-lg px-3 py-1.5 shadow-lg`}
+                    data.matchPercentage >= 85
+                      ? "bg-emerald-600"
+                      : "bg-orange-600"
+                  } text-white font-bold text-sm px-3 py-1 shadow-md`}
                 >
                   {data.matchPercentage}% Match
                 </Badge>
@@ -141,95 +165,73 @@ export default function RecipeCard({ recipe, variant = "default" }) {
           </div>
         )}
 
-        <CardHeader>
+        <CardHeader className="p-6 pb-2">
           <div className="flex justify-between items-start">
-            <div className="flex-1">
-              <div className="flex flex-wrap gap-2 mb-3">
-                {data.cuisine && (
-                  <Badge
-                    variant="outline"
-                    className="text-orange-600 border-orange-200 capitalize"
-                  >
-                    {data.cuisine}
-                  </Badge>
-                )}
-                {data.category && (
-                  <Badge
-                    variant="outline"
-                    className="text-stone-600 border-stone-200 capitalize"
-                  >
-                    {data.category}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            {/* Match Percentage Badge (if no image) */}
-            {!data.showImage && data.matchPercentage && (
-              <div className="flex flex-col items-end gap-1">
-                <Badge
-                  className={`${
-                    data.matchPercentage >= 90
-                      ? "bg-green-600"
-                      : data.matchPercentage >= 75
-                      ? "bg-orange-600"
-                      : "bg-stone-600"
-                  } text-white text-lg px-3 py-1`}
-                >
-                  {data.matchPercentage}%
+            <div className="flex flex-wrap gap-2 mb-2">
+              {data.cuisine && (
+                <Badge variant="outline" className="text-orange-600 border-orange-200 capitalize">
+                  {data.cuisine}
                 </Badge>
-                <span className="text-xs text-stone-500">Match</span>
-              </div>
-            )}
+              )}
+              {data.category && (
+                <Badge variant="outline" className="text-stone-600 border-stone-200 capitalize">
+                  {data.category}
+                </Badge>
+              )}
+            </div>
+
+            <button
+              onClick={handleFavoriteClick}
+              className="p-2 text-stone-400 hover:text-red-500 transition-transform active:scale-90"
+            >
+              <Heart className={`w-5 h-5 ${fav ? "fill-red-500 text-red-500" : ""}`} />
+            </button>
           </div>
 
-          <CardTitle className="text-2xl font-serif font-bold text-stone-900">
+          <CardTitle className="text-2xl font-black text-stone-900 leading-tight">
             {data.title}
           </CardTitle>
 
           {data.description && (
-            <CardDescription className="text-stone-600 leading-relaxed mt-2">
+            <CardDescription className="text-stone-600 text-sm mt-2 line-clamp-2">
               {data.description}
             </CardDescription>
           )}
         </CardHeader>
 
-        <CardContent className="space-y-4 flex-1">
-          {/* Time & Servings */}
+        <CardContent className="px-6 py-3 space-y-3 flex-1">
           {(data.prepTime || data.cookTime || data.servings) && (
-            <div className="flex gap-4 text-sm text-stone-500">
+            <div className="flex gap-4 text-xs font-semibold text-stone-500">
               {(data.prepTime || data.cookTime) && (
                 <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  <span>
-                    {parseInt(data.prepTime || 0) +
-                      parseInt(data.cookTime || 0)}{" "}
-                    mins
-                  </span>
+                  <Clock className="w-4 h-4 text-orange-600" />
+                  <span>{parseInt(data.prepTime || 0) + parseInt(data.cookTime || 0)} mins</span>
                 </div>
               )}
               {data.servings && (
                 <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 text-orange-600" />
                   <span>{data.servings} servings</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Missing Ingredients */}
           {data.missingIngredients && data.missingIngredients.length > 0 && (
-            <div className="p-4 bg-orange-50 border border-orange-100">
-              <h4 className="text-sm font-semibold text-orange-900 mb-2">
-                You&apos;ll need:
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {data.missingIngredients.map((ingredient, i) => (
-                  <Badge
-                    key={i}
-                    variant="outline"
-                    className="text-orange-700 border-orange-200 bg-white"
-                  >
-                    {ingredient}
+            <div className="p-3.5 bg-orange-50/80 border border-orange-200 rounded-2xl">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold text-orange-900">Missing Items:</span>
+                <button
+                  onClick={handleAddMissingToShoppingList}
+                  className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline flex items-center gap-1 cursor-pointer"
+                >
+                  <ShoppingBag className="w-3 h-3" /> Add to List
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {data.missingIngredients.map((item, i) => (
+                  <Badge key={i} variant="outline" className="text-[11px] bg-white border-orange-200 text-orange-800">
+                    {item}
                   </Badge>
                 ))}
               </div>
@@ -237,11 +239,10 @@ export default function RecipeCard({ recipe, variant = "default" }) {
           )}
         </CardContent>
 
-        <CardFooter>
-          <Link href={data.href} className="w-full">
-            <Button className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
-              <ChefHat className="w-4 h-4" />
-              View Full Recipe
+        <CardFooter className="p-6 pt-2">
+          <Link href={data.href || "#"} className="w-full">
+            <Button variant="emerald" className="w-full gap-2 rounded-2xl">
+              <ChefHat className="w-4 h-4" /> Start Cooking
             </Button>
           </Link>
         </CardFooter>
@@ -249,116 +250,84 @@ export default function RecipeCard({ recipe, variant = "default" }) {
     );
   }
 
-  // Variant: list (for saved recipes, search results)
-  if (variant === "list") {
-    return (
-      <Link href={data.href}>
-        <Card className="rounded-none border-stone-200 hover:shadow-lg hover:border-orange-200 transition-all cursor-pointer group overflow-hidden py-0">
-          <div className="flex flex-col md:flex-row">
-            {/* Image (if available) */}
-            {data.showImage ? (
-              <div className="relative w-full md:w-48 aspect-video md:aspect-square flex-shrink-0">
-                <Image
-                  src={data.image}
-                  alt={data.title}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  sizes="(max-width: 768px) 100vw, 192px"
-                />
-              </div>
-            ) : (
-              // Fallback gradient when no image
-              <div className="relative w-full md:w-48 aspect-video md:aspect-square flex-shrink-0 bg-gradient-to-br from-orange-400 to-amber-400 flex items-center justify-center">
-                <ChefHat className="w-12 h-12 text-white/30" />
-              </div>
-            )}
-
-            {/* Content */}
-            <div className="flex-1 py-5">
-              <CardHeader>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {data.cuisine && (
-                    <Badge
-                      variant="outline"
-                      className="text-orange-600 border-orange-200 capitalize"
-                    >
-                      {data.cuisine}
-                    </Badge>
-                  )}
-                  {data.category && (
-                    <Badge
-                      variant="outline"
-                      className="text-stone-600 border-stone-200 capitalize"
-                    >
-                      {data.category}
-                    </Badge>
-                  )}
-                </div>
-
-                <CardTitle className="text-xl font-bold text-stone-900 group-hover:text-orange-600 transition-colors">
-                  {data.title}
-                </CardTitle>
-
-                {data.description && (
-                  <CardDescription className="line-clamp-2">
-                    {data.description}
-                  </CardDescription>
-                )}
-              </CardHeader>
-
-              {(data.prepTime || data.cookTime || data.servings) && (
-                <CardContent>
-                  <div className="flex gap-4 text-sm text-stone-500 pt-4">
-                    {(data.prepTime || data.cookTime) && (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>
-                          {parseInt(data.prepTime || 0) +
-                            parseInt(data.cookTime || 0)}{" "}
-                          mins
-                        </span>
-                      </div>
-                    )}
-                    {data.servings && (
-                      <div className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        <span>{data.servings} servings</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              )}
-            </div>
-          </div>
-        </Card>
-      </Link>
-    );
-  }
-
-  // Default variant (fallback)
+  // Variant: list (saved recipes / list mode)
   return (
-    <Link href={data.href}>
-      <Card className="rounded-none border-stone-200 hover:shadow-lg transition-all cursor-pointer overflow-hidden py-0">
-        {data.showImage && (
-          <div className="relative aspect-video">
+    <Card className="rounded-3xl border border-stone-200 hover:border-orange-500 hover:shadow-xl transition-all duration-300 overflow-hidden bg-white cursor-pointer group p-0">
+      <Link href={data.href || "#"} className="flex flex-col sm:flex-row items-stretch">
+        <div className="relative w-full sm:w-52 aspect-4/3 sm:aspect-auto shrink-0 bg-stone-100">
+          {data.showImage && !imageError ? (
             <Image
               src={data.image}
               alt={data.title}
               fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 400px"
+              className="object-cover group-hover:scale-105 transition-transform duration-500"
+              onError={() => setImageError(true)}
+              sizes="(max-width: 640px) 100vw, 208px"
             />
-          </div>
-        )}
-        <CardHeader>
-          <CardTitle className="text-lg">{data.title}</CardTitle>
-          {data.description && (
-            <CardDescription className="line-clamp-2">
-              {data.description}
-            </CardDescription>
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center min-h-[140px]">
+              <ChefHat className="w-12 h-12 text-white/30" />
+            </div>
           )}
-        </CardHeader>
-      </Card>
-    </Link>
+        </div>
+
+        <div className="p-6 flex-1 flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start gap-2 mb-2">
+              <div className="flex flex-wrap gap-1.5">
+                {data.cuisine && (
+                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-200 capitalize">
+                    {data.cuisine}
+                  </Badge>
+                )}
+                {data.category && (
+                  <Badge variant="outline" className="text-xs text-stone-600 border-stone-200 capitalize">
+                    {data.category}
+                  </Badge>
+                )}
+              </div>
+
+              <button
+                onClick={handleFavoriteClick}
+                className="p-1 text-stone-400 hover:text-red-500 transition-transform active:scale-90"
+              >
+                <Heart className={`w-5 h-5 ${fav ? "fill-red-500 text-red-500" : ""}`} />
+              </button>
+            </div>
+
+            <h3 className="text-xl font-bold text-stone-900 group-hover:text-orange-600 transition-colors line-clamp-1">
+              {data.title}
+            </h3>
+
+            {data.description && (
+              <p className="text-xs text-stone-600 mt-1 line-clamp-2 font-light">
+                {data.description}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mt-4 text-xs font-semibold text-stone-500 pt-3 border-t border-stone-100">
+            <div className="flex gap-4">
+              {(data.prepTime || data.cookTime) && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-orange-600" />
+                  {parseInt(data.prepTime || 0) + parseInt(data.cookTime || 0)} mins
+                </span>
+              )}
+              {data.servings && (
+                <span className="flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5 text-orange-600" />
+                  {data.servings} serv
+                </span>
+              )}
+            </div>
+
+            <span className="text-orange-600 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+              View <ArrowRight className="w-3.5 h-3.5" />
+            </span>
+          </div>
+        </div>
+      </Link>
+    </Card>
   );
 }
