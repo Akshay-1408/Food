@@ -4,7 +4,6 @@ import Header from "@/components/Header";
 import MobileNav from "@/components/MobileNav";
 import { DialControlPanel } from "@/components/ui/dial-kit";
 import { ClerkProvider } from "@clerk/nextjs";
-import { neobrutalism } from "@clerk/themes";
 import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -16,7 +15,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <ClerkProvider appearance={{ theme: neobrutalism }}>
+    <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body className={`${inter.className} bg-stone-50 text-stone-900 antialiased selection:bg-orange-500 selection:text-white`}>
           <Header />
