@@ -1,8 +1,10 @@
-import { SignUp } from '@clerk/nextjs'
-import React from 'react'
+import Link from "next/link";
 
-const SignUpPage = () => {
-  return <SignUp  />
+export default function SignUpPage() {
+  return (
+    <div className="text-center py-10">
+      <h1 className="text-2xl font-bold text-stone-900 mb-4">Sign Up</h1>
+      <p className="text-stone-600 mb-6">Auth is currently disabled. <Link href="/dashboard" className="text-orange-600 font-semibold hover:underline">Go to Dashboard →</Link></p>
+    </div>
+  );
 }
-
-export default SignUpPage

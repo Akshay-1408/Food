@@ -1,6 +1,7 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { auth } from "@clerk/nextjs/server";
 import { ArrowRight, Clock, Flame, Star, User, Sparkles, ChefHat, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,10 +10,7 @@ import { FEATURES, HOW_IT_WORKS_STEPS, SITE_STATS } from "@/lib/data";
 import PricingSection from "@/components/PricingSection";
 import { DialButton } from "@/components/ui/dial-kit";
 
-export default async function Home() {
-  const { has } = await auth();
-  const subscriptionTier = has({ plan: "pro" }) ? "pro" : "free";
-
+export default function Home() {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 overflow-hidden">
       {/* Hero Section */}
@@ -211,7 +209,7 @@ export default async function Home() {
       {/* Pricing Section */}
       <section className="py-24 px-4">
         <div className="max-w-5xl mx-auto">
-          <PricingSection subscriptionTier={subscriptionTier} />
+          <PricingSection />
         </div>
       </section>
     </div>
