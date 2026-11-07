@@ -25,27 +25,23 @@ import { toast } from "sonner";
 import { DialButton } from "./ui/dial-kit";
 
 export default function ShoppingListModal({ isOpen, onClose }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState(() => (typeof window !== "undefined" ? getShoppingList() : []));
   const [newItemName, setNewItemName] = useState("");
   const [newItemAmount, setNewItemAmount] = useState("");
   const [activeTab, setActiveTab] = useState("all");
 
-  const loadList = () => {
-    setItems(getShoppingList());
-  };
-
   useEffect(() => {
+    const handleUpdate = () => {
+      setItems(getShoppingList());
+    };
+
     if (isOpen) {
-      loadList();
+      handleUpdate();
     }
-    const handleUpdate = () => loadList();
-    if (typeof window !== "undefined") {
-      window.addEventListener("servd-shopping-list-updated", handleUpdate);
-    }
+
+    window.addEventListener("servd-shopping-list-updated", handleUpdate);
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("servd-shopping-list-updated", handleUpdate);
-      }
+      window.removeEventListener("servd-shopping-list-updated", handleUpdate);
     };
   }, [isOpen]);
 

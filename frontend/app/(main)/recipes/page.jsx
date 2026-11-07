@@ -18,7 +18,9 @@ export default function SavedRecipesPage() {
   } = useFetch(getSavedRecipes);
 
   const [activeTab, setActiveTab] = useState("saved"); // "saved" | "favorites"
-  const [localFavorites, setLocalFavorites] = useState([]);
+  const [localFavorites, setLocalFavorites] = useState(() =>
+    typeof window !== "undefined" ? getFavorites() : []
+  );
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,18 +29,14 @@ export default function SavedRecipesPage() {
 
   useEffect(() => {
     fetchSavedRecipes();
-    setLocalFavorites(getFavorites());
 
     const handleFavUpdate = () => {
       setLocalFavorites(getFavorites());
     };
-    if (typeof window !== "undefined") {
-      window.addEventListener("servd-favorites-updated", handleFavUpdate);
-    }
+
+    window.addEventListener("servd-favorites-updated", handleFavUpdate);
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("servd-favorites-updated", handleFavUpdate);
-      }
+      window.removeEventListener("servd-favorites-updated", handleFavUpdate);
     };
   }, []);
 

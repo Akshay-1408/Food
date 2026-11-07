@@ -5,34 +5,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
-  UtensilsCrossed,
   Package,
   Bookmark,
   ShoppingBag,
 } from "lucide-react";
 import { getShoppingList } from "@/lib/shopping-list";
 import ShoppingListModal from "./ShoppingListModal";
+import { motion } from "framer-motion";
 
 export default function MobileNav() {
   const pathname = usePathname();
   const [shoppingCount, setShoppingCount] = useState(0);
   const [isShoppingOpen, setIsShoppingOpen] = useState(false);
 
-  const updateCount = () => {
-    const list = getShoppingList();
-    setShoppingCount(list.filter((i) => !i.completed).length);
-  };
-
   useEffect(() => {
+    const updateCount = () => {
+      const list = getShoppingList();
+      setShoppingCount(list.filter((i) => !i.completed).length);
+    };
+
     updateCount();
-    const handleUpdate = () => updateCount();
-    if (typeof window !== "undefined") {
-      window.addEventListener("servd-shopping-list-updated", handleUpdate);
-    }
+    window.addEventListener("servd-shopping-list-updated", updateCount);
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("servd-shopping-list-updated", handleUpdate);
-      }
+      window.removeEventListener("servd-shopping-list-updated", updateCount);
     };
   }, []);
 
@@ -44,42 +39,76 @@ export default function MobileNav() {
 
   return (
     <>
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-2 flex items-center justify-around shadow-lg">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-stone-200/60 px-2 py-2 flex items-center justify-around shadow-2xl shadow-stone-900/5">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-2xl transition-all ${
-                isActive
-                  ? "text-orange-600 font-bold scale-105"
-                  : "text-stone-500 hover:text-stone-900 font-medium"
-              }`}
+              whileTap={{ scale: 0.85 }}
+              className="relative"
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px]">{item.label}</span>
-            </Link>
+              {/* Active indicator dot */}
+              {isActive && (
+                <motion.span
+                  layoutId="nav-dot"
+                  className="absolute -top-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-500"
+                />
+              )}
+
+              <Link
+                href={item.href}
+                className="flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl transition-all relative"
+              >
+                {/* Active pill background */}
+                {isActive && (
+                  <motion.span
+                    layoutId="nav-pill"
+                    className="absolute inset-0 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 opacity-15"
+                  />
+                )}
+
+                <Icon
+                  className={`w-5 h-5 relative z-10 transition-colors ${
+                    isActive ? "text-orange-600" : "text-stone-400"
+                  }`}
+                />
+                <span
+                  className={`text-[10px] relative z-10 transition-colors ${
+                    isActive
+                      ? "text-orange-600 font-bold"
+                      : "text-stone-400 font-medium"
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            </motion.div>
           );
         })}
 
         {/* Shopping List Trigger */}
-        <button
+        <motion.button
+          whileTap={{ scale: 0.85 }}
           onClick={() => setIsShoppingOpen(true)}
-          className="relative flex flex-col items-center gap-1 py-1 px-3 text-stone-500 hover:text-orange-600 font-medium cursor-pointer"
+          className="relative flex flex-col items-center gap-1 py-1.5 px-4 rounded-2xl text-stone-400 hover:text-orange-600 font-medium cursor-pointer transition-colors"
         >
           <div className="relative">
             <ShoppingBag className="w-5 h-5" />
             {shoppingCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-orange-600 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1.5 -right-2 bg-gradient-to-br from-orange-500 to-amber-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center shadow-sm"
+              >
                 {shoppingCount}
-              </span>
+              </motion.span>
             )}
           </div>
           <span className="text-[10px]">Shop</span>
-        </button>
+        </motion.button>
       </div>
 
       <ShoppingListModal

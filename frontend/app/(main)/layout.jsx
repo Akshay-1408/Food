@@ -1,6 +1,26 @@
-const MainLayout = ({children}) => {
-    return <div className="pt-10">{children}</div>;
-};
+"use client";
 
+import { motion, AnimatePresence } from "framer-motion";
+import { usePathname } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
+const MainLayout = ({ children }) => {
+  const pathname = usePathname();
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={pathname}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="pt-10"
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+};
 
 export default MainLayout;

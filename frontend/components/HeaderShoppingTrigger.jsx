@@ -10,21 +10,16 @@ export default function HeaderShoppingTrigger() {
   const [count, setCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
 
-  const updateCount = () => {
-    const list = getShoppingList();
-    setCount(list.filter((i) => !i.completed).length);
-  };
-
   useEffect(() => {
+    const updateCount = () => {
+      const list = getShoppingList();
+      setCount(list.filter((i) => !i.completed).length);
+    };
+
     updateCount();
-    const handleUpdate = () => updateCount();
-    if (typeof window !== "undefined") {
-      window.addEventListener("servd-shopping-list-updated", handleUpdate);
-    }
+    window.addEventListener("servd-shopping-list-updated", updateCount);
     return () => {
-      if (typeof window !== "undefined") {
-        window.removeEventListener("servd-shopping-list-updated", handleUpdate);
-      }
+      window.removeEventListener("servd-shopping-list-updated", updateCount);
     };
   }, []);
 

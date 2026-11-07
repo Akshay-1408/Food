@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { Clock, Users, ChefHat, Heart, ShoppingBag, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +13,6 @@ import { addMultipleShoppingItems } from "@/lib/shopping-list";
 import { toast } from "sonner";
 
 export default function RecipeCard({ recipe, variant = "default" }) {
-  const [fav, setFav] = useState(false);
-  const [imageError, setImageError] = useState(false);
-
   // Normalize recipe data
   const getRecipeData = () => {
     if (!recipe) return {};
@@ -65,11 +63,19 @@ export default function RecipeCard({ recipe, variant = "default" }) {
   };
 
   const data = getRecipeData();
+  const [fav, setFav] = useState(() => (data.title ? isFavorite(data.title) : false));
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
-    if (data.title) {
-      setFav(isFavorite(data.title));
-    }
+    const handleFavChange = () => {
+      if (data.title) {
+        setFav(isFavorite(data.title));
+      }
+    };
+    window.addEventListener("servd-favorites-updated", handleFavChange);
+    return () => {
+      window.removeEventListener("servd-favorites-updated", handleFavChange);
+    };
   }, [data.title]);
 
   const handleFavoriteClick = (e) => {
@@ -96,16 +102,23 @@ export default function RecipeCard({ recipe, variant = "default" }) {
   // Variant: grid
   if (variant === "grid") {
     return (
-      <Card className="rounded-3xl overflow-hidden border border-stone-200 hover:border-orange-500 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group bg-white cursor-pointer p-0 relative">
+      <motion.div
+        whileHover={{ y: -4, boxShadow: "0 20px 40px -12px rgba(0,0,0,0.15)" }}
+        transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        className="rounded-3xl overflow-hidden border border-stone-200 hover:border-orange-500 transition-colors duration-300 group bg-white cursor-pointer relative"
+      >
         <Link href={data.href || "#"} className="block">
           {/* Favorite Button Overlay */}
-          <button
+          <motion.button
             onClick={handleFavoriteClick}
-            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/80 backdrop-blur-md shadow-md text-stone-600 hover:text-red-500 transition-transform active:scale-90"
+            className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white/80 backdrop-blur-md shadow-md text-stone-600 hover:text-red-500"
             title={fav ? "Remove Favorite" : "Save Favorite"}
+            whileTap={{ scale: 0.8 }}
+            animate={{ scale: fav ? [1, 1.3, 1] : 1 }}
+            transition={{ duration: 0.3 }}
           >
             <Heart className={`w-4 h-4 ${fav ? "fill-red-500 text-red-500" : ""}`} />
-          </button>
+          </motion.button>
 
           {/* Image */}
           <div className="relative aspect-4/3 overflow-hidden bg-stone-100">
@@ -123,7 +136,7 @@ export default function RecipeCard({ recipe, variant = "default" }) {
                 <ChefHat className="w-16 h-16 text-white/30" />
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </div>
 
           <CardHeader className="p-4">
@@ -132,12 +145,15 @@ export default function RecipeCard({ recipe, variant = "default" }) {
             </CardTitle>
           </CardHeader>
         </Link>
-      </Card>
+      </motion.div>
     );
   }
 
   // Variant: pantry (AI-generated match recommendations)
   if (variant === "pantry") {
+    const matchPct = data.matchPercentage ?? 0;
+    const progressColor = matchPct >= 85 ? "bg-emerald-500" : "bg-orange-500";
+
     return (
       <Card className="rounded-3xl border border-stone-200 hover:border-emerald-500 hover:shadow-xl transition-all duration-300 overflow-hidden bg-white flex flex-col">
         {data.showImage && !imageError && (
@@ -165,6 +181,26 @@ export default function RecipeCard({ recipe, variant = "default" }) {
           </div>
         )}
 
+        {/* Match percentage progress bar */}
+        {data.matchPercentage && (
+          <div className="px-6 pt-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Pantry Match</span>
+              <span className={`text-[11px] font-black ${matchPct >= 85 ? "text-emerald-600" : "text-orange-600"}`}>
+                {matchPct}%
+              </span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-stone-100 overflow-hidden">
+              <motion.div
+                className={`h-full rounded-full ${progressColor}`}
+                initial={{ width: 0 }}
+                animate={{ width: `${matchPct}%` }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </div>
+          </div>
+        )}
+
         <CardHeader className="p-6 pb-2">
           <div className="flex justify-between items-start">
             <div className="flex flex-wrap gap-2 mb-2">
@@ -180,12 +216,15 @@ export default function RecipeCard({ recipe, variant = "default" }) {
               )}
             </div>
 
-            <button
+            <motion.button
               onClick={handleFavoriteClick}
-              className="p-2 text-stone-400 hover:text-red-500 transition-transform active:scale-90"
+              className="p-2 text-stone-400 hover:text-red-500"
+              whileTap={{ scale: 0.8 }}
+              animate={{ scale: fav ? [1, 1.3, 1] : 1 }}
+              transition={{ duration: 0.3 }}
             >
               <Heart className={`w-5 h-5 ${fav ? "fill-red-500 text-red-500" : ""}`} />
-            </button>
+            </motion.button>
           </div>
 
           <CardTitle className="text-2xl font-black text-stone-900 leading-tight">
@@ -287,12 +326,15 @@ export default function RecipeCard({ recipe, variant = "default" }) {
                 )}
               </div>
 
-              <button
+              <motion.button
                 onClick={handleFavoriteClick}
-                className="p-1 text-stone-400 hover:text-red-500 transition-transform active:scale-90"
+                className="p-1 text-stone-400 hover:text-red-500"
+                whileTap={{ scale: 0.8 }}
+                animate={{ scale: fav ? [1, 1.3, 1] : 1 }}
+                transition={{ duration: 0.3 }}
               >
                 <Heart className={`w-5 h-5 ${fav ? "fill-red-500 text-red-500" : ""}`} />
-              </button>
+              </motion.button>
             </div>
 
             <h3 className="text-xl font-bold text-stone-900 group-hover:text-orange-600 transition-colors line-clamp-1">
@@ -322,9 +364,13 @@ export default function RecipeCard({ recipe, variant = "default" }) {
               )}
             </div>
 
-            <span className="text-orange-600 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+            <motion.span
+              className="text-orange-600 font-bold flex items-center gap-1"
+              whileHover={{ x: 3 }}
+              transition={{ duration: 0.15 }}
+            >
               View <ArrowRight className="w-3.5 h-3.5" />
-            </span>
+            </motion.span>
           </div>
         </div>
       </Link>

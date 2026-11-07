@@ -18,18 +18,23 @@ export default function CookingTimer({ instructions = [] }) {
     let interval = null;
     if (isTimerRunning && timerSeconds > 0) {
       interval = setInterval(() => {
-        setTimerSeconds((prev) => prev - 1);
+        setTimerSeconds((prev) => {
+          if (prev <= 1) {
+            setIsTimerRunning(false);
+            toast.success("⏰ Timer Finished! Step time is up!", {
+              duration: 8000,
+            });
+            try {
+              const audio = new Audio(
+                "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"
+              );
+              audio.play().catch(() => {});
+            } catch (err) {}
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
-    } else if (timerSeconds === 0 && isTimerRunning) {
-      setIsTimerRunning(false);
-      toast.success("⏰ Timer Finished! Step time is up!", {
-        duration: 8000,
-      });
-      // Play a subtle chime audio if available
-      try {
-        const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-        audio.play().catch(() => {});
-      } catch (err) {}
     }
     return () => clearInterval(interval);
   }, [isTimerRunning, timerSeconds]);
